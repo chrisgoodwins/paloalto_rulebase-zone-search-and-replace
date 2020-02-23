@@ -128,7 +128,7 @@ def getDG(fwip, mainkey, devTree):
             for dgName in dgList:
                 print('%s) %s' % (i, dgName))
                 i += 1
-            dgChoice = int(input('\nChoose a number for the device-group:\n\nAnswer is: '))
+            dgChoice = int(input('\nChoose a number for the device-group:\n\nAnswer: '))
             reportDG = dgList[dgChoice - 1]
             break
         except:
@@ -236,7 +236,7 @@ def elementBuilder(policyMatches, new_zone, apiCall_piece):
         members = []
         to_element = "<entry name='%s'><to><member>%s</member></to></entry>" % (policy_name, new_zone)
         from_element = "<entry name='%s'><from><member>%s</member></from></entry>" % (policy_name, new_zone)
-        if len(elements_all) + len(apiCall_piece) + len(to_element) > 6000:
+        if len(elements_all) + len(apiCall_piece) + len(to_element) > 5000:
             elements_list.append(elements_all)
             elements_all = ''
         if policy_dict['to'] != []:
@@ -244,7 +244,7 @@ def elementBuilder(policyMatches, new_zone, apiCall_piece):
             for item in policy_dict['to']:
                 members.append("/entry[@name='%s']/to/member[text()='%s']" % (policy_name, item))
                 members_to_delete[policy_name] = members
-        if len(elements_all) + len(apiCall_piece) + len(from_element) > 6000:
+        if len(elements_all) + len(apiCall_piece) + len(from_element) > 5000:
             elements_list.append(elements_all)
             elements_all = ''
         if policy_dict['from'] != []:
@@ -267,6 +267,8 @@ def apiPush(fwip, mainkey, dg, rulebase_type, rulebase_category, policyMatches, 
         xmlUrl = baseUrl + "&element=&key=" + mainkey
     zone_add_list, members_to_delete = elementBuilder(policyMatches, new_zone, xmlUrl)
     input('\n\nHit Enter to push the new zone to the policies that matched (or CTRL+C to exit the script)... ')
+    time.sleep(1)
+    print('\nPolicy changes being pushed, please be patient...')
     for zone_element in zone_add_list:
         fullUrl = baseUrl + "&element=" + zone_element + "&key=" + mainkey
         r = requests.get(fullUrl, verify=False)
@@ -274,7 +276,7 @@ def apiPush(fwip, mainkey, dg, rulebase_type, rulebase_category, policyMatches, 
         if tree.get('status') != "success":
             print('\n\nThere was an issue with an API call, below is the faulty call...\n\n%s\n' % fullUrl)
             exit()
-    print('\n...Done...')
+    print('\n\n...Done...')
     time.sleep(1)
     input('\n\nThere are %s zones that need to be removed from the %s matching policies. Each zone is removed by a separate API call\nPlease be aware that this could have an impact on the management plane of your PAN device\n\nHit Enter to push the API calls to remove the old zones from the policies that matched (or CTRL+C to exit the script)... ' % (sum([len(members_to_delete[i]) for i in members_to_delete]), len(members_to_delete)))
     print('\n')
