@@ -1,2 +1,2 @@
 # paloalto_rulebase-zone-search-and-replace
-Use regex to search &amp; replace zones in rulebases on firewall or Panorama device group
+Using regex, search and replace zones in security, NAT, decryption, or authentication rulebases for firewall or Panorama device groups. The script can be run either against a live device using the API, or in offline mode against a config file (provided as a command argument). It is recommended to run offline if you have a lot of zones to replace, since each zone replacement requires it's own API call, which can have an impact on the management plane of your PAN device.
