@@ -77,13 +77,12 @@ def getCreds():
 def getkey(fwip):
     while True:
         try:
-            fwipgetkey = fwip
             username, password = getCreds()
-            keycall = "https://%s/api/?type=keygen&user=%s&password=%s" % (fwipgetkey, username, password)
+            keycall = f"https://{fwip}/api/?type=keygen&user={username}&password={password}"
             r = requests.get(keycall, verify=False)
             tree = ET.fromstring(r.text)
             if tree.get('status') == "success":
-                apikey = tree[0][0].text
+                apikey = tree.find('./result/key').text
                 break
             else:
                 print("\nYou have entered an incorrect username or password. Please try again...\n")
@@ -96,7 +95,7 @@ def getkey(fwip):
 # Determine whether the device is Panorama or firewall
 def getDevType(fwip, mainkey, devTree):
     if devTree is None:
-        devURL = "https://%s/api/?type=config&action=get&xpath=/config/devices/entry/device-group&key=%s" % (fwip, mainkey)
+        devURL = f"https://{fwip}/api/?type=config&action=get&xpath=/config/devices/entry/device-group&key={mainkey}"
         r = requests.get(devURL, verify=False)
         devTree = ET.fromstring(r.text)
     if devTree.find('.//device-group/entry') is None:
@@ -112,7 +111,7 @@ def getDevType(fwip, mainkey, devTree):
 # Presents the user with a choice of device-groups
 def getDG(fwip, mainkey, devTree):
     if devTree is None:
-        dgXmlUrl = "https://%s/api/?type=config&action=get&xpath=/config/devices/entry/device-group&key=%s" % (fwip, mainkey)
+        dgXmlUrl = f"https://{fwip}/api/?type=config&action=get&xpath=/config/devices/entry/device-group&key={mainkey}"
         r = requests.get(dgXmlUrl, verify=False)
         devTree = ET.fromstring(r.text)
         devTreeString = './/device-group/entry'
@@ -123,10 +122,10 @@ def getDG(fwip, mainkey, devTree):
         dgList.append(entry.get('name'))
     while True:
         try:
-            print('\n\nHere\'s a list of device groups found in Panorama...\n')
+            print("\n\nHere's a list of device groups found in Panorama...\n")
             i = 1
             for dgName in dgList:
-                print('%s) %s' % (i, dgName))
+                print(f'{i}) {dgName}')
                 i += 1
             dgChoice = int(input('\nChoose a number for the device-group:\n\nAnswer: '))
             reportDG = dgList[dgChoice - 1]
@@ -169,17 +168,17 @@ def pre_or_post():
 def getPolicies(fwip, mainkey, dg, devTree, rulebase_type, rulebase_category):
     if devTree is None:
         if dg is None:
-            xmlUrl = "https://%s/api/?type=config&action=get&xpath=/config/devices/entry/vsys/entry/rulebase/%s/rules&key=%s" % (fwip, rulebase_category, mainkey)
+            xmlUrl = f"https://{fwip}/api/?type=config&action=get&xpath=/config/devices/entry/vsys/entry/rulebase/{rulebase_category}/rules&key={mainkey}"
         else:
-            xmlUrl = "https://%s/api/?type=config&action=get&xpath=/config/devices/entry/device-group/entry[@name='%s']/%s/%s/rules&key=%s" % (fwip, dg, rulebase_type, rulebase_category, mainkey)
+            xmlUrl = f"https://{fwip}/api/?type=config&action=get&xpath=/config/devices/entry/device-group/entry[@name='{dg}']/{rulebase_type}/{rulebase_category}/rules&key={mainkey}"
         r = requests.get(xmlUrl, verify=False)
         devTree = ET.fromstring(r.text)
         devTreeString = './/rules/entry'
     else:
         if dg is None:
-            devTreeString = './/rulebase/%s/rules/entry' % (rulebase_category)
+            devTreeString = f'.//rulebase/{rulebase_category}/rules/entry'
         else:
-            devTreeString = ".//device-group/entry[@name='%s']/%s/%s/rules/entry" % (dg, rulebase_type, rulebase_category)
+            devTreeString = f".//device-group/entry[@name='{dg}']/{rulebase_type}/{rulebase_category}/rules/entry"
     return devTree.findall(devTreeString)
 
 
@@ -223,7 +222,7 @@ def displayMatches(policyMatches):
         print('\nMatching policy: ' + policy_name)
         for key, value in policy_value.items():
             if len(value) > 0:
-                print('%s zone match: %s' % (key, ', '.join(value)))
+                print(f"{key} zone match: {', '.join(value)}")
 
 
 # Build a dictionary of zones to removea, and a list of element strings to add, it also checks the lenth
@@ -234,15 +233,15 @@ def elementBuilder(policyMatches, new_zone, apiCall_piece):
     elements_all = ''
     for policy_name, policy_dict in policyMatches.items():
         members = []
-        to_element = "<entry name='%s'><to><member>%s</member></to></entry>" % (policy_name, new_zone)
-        from_element = "<entry name='%s'><from><member>%s</member></from></entry>" % (policy_name, new_zone)
+        to_element = f"<entry name='{policy_name}'><to><member>{new_zone}</member></to></entry>"
+        from_element = f"<entry name='{policy_name}'><from><member>{new_zone}</member></from></entry>"
         if len(elements_all) + len(apiCall_piece) + len(to_element) > 5000:
             elements_list.append(elements_all)
             elements_all = ''
         if policy_dict['to'] != []:
             elements_all += to_element
             for item in policy_dict['to']:
-                members.append("/entry[@name='%s']/to/member[text()='%s']" % (policy_name, item))
+                members.append(f"/entry[@name='{policy_name}']/to/member[text()='{item}']")
                 members_to_delete[policy_name] = members
         if len(elements_all) + len(apiCall_piece) + len(from_element) > 5000:
             elements_list.append(elements_all)
@@ -250,7 +249,7 @@ def elementBuilder(policyMatches, new_zone, apiCall_piece):
         if policy_dict['from'] != []:
             elements_all += from_element
             for item in policy_dict['from']:
-                members.append("/entry[@name='%s']/from/member[text()='%s']" % (policy_name, item))
+                members.append(f"/entry[@name='{policy_name}']/from/member[text()='{item}']")
                 members_to_delete[policy_name] = members
     if elements_all != '':
         elements_list.append(elements_all)
@@ -260,10 +259,10 @@ def elementBuilder(policyMatches, new_zone, apiCall_piece):
 # Push policy changes via API
 def apiPush(fwip, mainkey, dg, rulebase_type, rulebase_category, policyMatches, new_zone):
     if dg is None:
-        baseUrl = "https://%s/api/?type=config&action=set&xpath=/config/devices/entry/vsys/entry/rulebase/%s/rules" % (fwip, rulebase_category)
+        baseUrl = f"https://{fwip}/api/?type=config&action=set&xpath=/config/devices/entry/vsys/entry/rulebase/{rulebase_category}/rules"
         xmlUrl = baseUrl + "&element=&key=" + mainkey
     else:
-        baseUrl = "https://%s/api/?type=config&action=set&xpath=/config/devices/entry/device-group/entry[@name='%s']/%s/%s/rules" % (fwip, dg, rulebase_type, rulebase_category)
+        baseUrl = f"https://{fwip}/api/?type=config&action=set&xpath=/config/devices/entry/device-group/entry[@name='{dg}']/{rulebase_type}/{rulebase_category}/rules"
         xmlUrl = baseUrl + "&element=&key=" + mainkey
     zone_add_list, members_to_delete = elementBuilder(policyMatches, new_zone, xmlUrl)
     input('\n\nHit Enter to push the new zone to the policies that matched (or CTRL+C to exit the script)... ')
@@ -274,11 +273,11 @@ def apiPush(fwip, mainkey, dg, rulebase_type, rulebase_category, policyMatches, 
         r = requests.get(fullUrl, verify=False)
         tree = ET.fromstring(r.text)
         if tree.get('status') != "success":
-            print('\n\nThere was an issue with an API call, below is the faulty call...\n\n%s\n' % fullUrl)
+            print(f'\n\nThere was an issue with an API call, below is the faulty call...\n\n{fullUrl}\n')
             exit()
     print('\n\n...Done...')
     time.sleep(1)
-    input('\n\nThere are %s zones that need to be removed from the %s matching policies. Each zone is removed by a separate API call\nPlease be aware that this could have an impact on the management plane of your PAN device\n\nHit Enter to push the API calls to remove the old zones from the policies that matched (or CTRL+C to exit the script)... ' % (sum([len(members_to_delete[i]) for i in members_to_delete]), len(members_to_delete)))
+    input(f'\n\nThere are {sum([len(members_to_delete[i]) for i in members_to_delete])} zones that need to be removed from the {len(members_to_delete)} matching policies. Each zone is removed by a separate API call\nPlease be aware that this could have an impact on the management plane of your PAN device\n\nHit Enter to push the API calls to remove the old zones from the policies that matched (or CTRL+C to exit the script)... ')
     print('\n')
     for key, value in members_to_delete.items():
         for item in value:
@@ -286,30 +285,30 @@ def apiPush(fwip, mainkey, dg, rulebase_type, rulebase_category, policyMatches, 
             r = requests.get(fullUrl, verify=False)
             tree = ET.fromstring(r.text)
             if tree.get('status') != "success":
-                print('\n\nThere was an issue with the API call for %s, below is the faulty call...\n\n%s\n' % (key, fullUrl))
+                print(f'\n\nThere was an issue with the API call for {key}, below is the faulty call...\n\n{fullUrl}\n')
                 input('\n\nHit Enter to continue removing zones (or CTRL+C to exit the script)... ')
             else:
-                print('Policy Name: %s - Old zone successfully removed' % (key))
+                print(f'Policy Name: {key} - Old zone successfully removed')
 
 
 # Push changes to the config, if offline mode is used
 def configUpdate(devTree, dg, rulebase_type, rulebase_category, policyMatches, new_zone):
     if dg is None:
-        devTreeString = './/rulebase/%s/rules/entry' % (rulebase_category)
+        devTreeString = f'.//rulebase/{rulebase_category}/rules/entry'
     else:
-        devTreeString = ".//device-group/entry[@name='%s']/%s/%s/rules/entry" % (dg, rulebase_type, rulebase_category)
+        devTreeString = f".//device-group/entry[@name='{dg}']/{rulebase_type}/{rulebase_category}/rules/entry"
     input('\n\nHit Enter to push the zone changes to PAN config (or CTRL+C to exit the script)... ')
     for policy_name, zone_elements in policyMatches.items():
         for key, value in zone_elements.items():
             if len(value) > 0:
-                tree_textToReplace = devTree.find("%s[@name='%s']/%s/member[.='%s']" % (devTreeString, policy_name, key, value[0]))
+                tree_textToReplace = devTree.find(f"{devTreeString}[@name='{policy_name}']/{key}/member[.='{value[0]}']")
                 count = 0
                 for item in value:
                     if count == 0:
                         tree_textToReplace.text = new_zone
                     else:
-                        tree_textToRemove = devTree.find("%s[@name='%s']/%s/member[.='%s']" % (devTreeString, policy_name, key, item))
-                        parent = devTree.find("%s[@name='%s']/%s" % (devTreeString, policy_name, key))
+                        tree_textToRemove = devTree.find(f"{devTreeString}[@name='{policy_name}']/{key}/member[.='{item}']")
+                        parent = devTree.find(f"{devTreeString}[@name='{policy_name}']/{key}")
                         parent.remove(tree_textToRemove)
                     count += 1
 
@@ -374,10 +373,10 @@ def main():
         # Push changes through API, or directly to config if offline mode
         if devTree is None:
             apiPush(fwip, mainkey, panoDG, rulebase_type, rulebase_category, policyMatches, new_zone)
-            print('\n\n\nCongrats, all zones have been replaced in the %s rulebase!' % (rulebase_category))
+            print(f'\n\n\nCongrats, all zones have been replaced in the {rulebase_category} rulebase!')
         else:
             configUpdate(devTree, panoDG, rulebase_type, rulebase_category, policyMatches, new_zone)
-            print('\n\n\nCongrats, all zones have been replaced in the %s rulebase!' % (rulebase_category))
+            print(f'\n\n\nCongrats, all zones have been replaced in the {rulebase_category} rulebase!')
             time.sleep(1)
             print('\n\nWriting config to file. Please hold....\n')
             panConfig.write(os.path.join(path, 'EDITED_BY_SCRIPT_' + file))
