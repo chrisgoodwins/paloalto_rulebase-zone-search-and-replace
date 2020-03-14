@@ -48,28 +48,28 @@ except ImportError:
 # Prompts the user to enter an address, then checks it's validity
 def getfwipfqdn():
     while True:
-        fwipraw = input("\nPlease enter Panorama/firewall IP or FQDN: ")
-        ipr = re.match(r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$", fwipraw)
-        fqdnr = re.match(r"(?=^.{4,253}$)(^((?!-)[a-zA-Z0-9-]{1,63}(?<!-)\.)+[a-zA-Z]{2,63}$)", fwipraw)
+        fwipraw = input('\nPlease enter Panorama/firewall IP or FQDN: ')
+        ipr = re.match(r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$', fwipraw)
+        fqdnr = re.match(r'(?=^.{4,253}$)(^((?!-)[a-zA-Z0-9-]{1,63}(?<!-)\.)+[a-zA-Z]{2,63}$)', fwipraw)
         if ipr:
             break
         elif fqdnr:
             break
         else:
-            print("\nThere was something wrong with your entry. Please try again...\n")
+            print('\nThere was something wrong with your entry. Please try again...\n')
     return fwipraw
 
 
 # Prompts the user to enter a username and password
 def getCreds():
     while True:
-        username = input("Please enter your user name: ")
-        usernamer = re.match(r"^[\w-]{3,24}$", username)
+        username = input('Please enter your user name: ')
+        usernamer = re.match(r'^[\w-]{3,24}$', username)
         if usernamer:
-            password = getpass.getpass("Please enter your password: ")
+            password = getpass.getpass('Please enter your password: ')
             break
         else:
-            print("\nThere was something wrong with your entry. Please try again...\n")
+            print('\nThere was something wrong with your entry. Please try again...\n')
     return username, password
 
 
@@ -78,16 +78,16 @@ def getkey(fwip):
     while True:
         try:
             username, password = getCreds()
-            keycall = f"https://{fwip}/api/?type=keygen&user={username}&password={password}"
+            keycall = f'https://{fwip}/api/?type=keygen&user={username}&password={password}'
             r = requests.get(keycall, verify=False)
             tree = ET.fromstring(r.text)
-            if tree.get('status') == "success":
+            if tree.get('status') == 'success':
                 apikey = tree.find('./result/key').text
                 break
             else:
-                print("\nYou have entered an incorrect username or password. Please try again...\n")
+                print('\nYou have entered an incorrect username or password. Please try again...\n')
         except requests.exceptions.ConnectionError:
-            print("\nThere was a problem connecting to the firewall. Please check the address and try again...\n")
+            print('\nThere was a problem connecting to the firewall. Please check the address and try again...\n')
             exit()
     return apikey
 
@@ -195,16 +195,16 @@ def filterPolicies(policyTree, regexString, new_zone):
         for from_member in entry.findall('./from/member'):
             if re.match(regexString, from_member.text) and from_member.text != new_zone:
                 fromMatches.append(from_member.text)
-        if toMatches != [] or fromMatches != []:
+        if toMatches or fromMatches:
             policyMatches[entry.get('name')] = {'to': toMatches, 'from': fromMatches}
         allMatches.extend(set(toMatches + fromMatches))
-    if policyMatches == {}:
+    if not policyMatches:
         return policyMatches
     print('\n\nThe following zones matched your search query:')
-    print(", ".join(set(allMatches)))
+    print(', '.join(set(allMatches)))
     time.sleep(1)
     while True:
-        user_input = input('\n\nThere are %s matching policies. Would you like to see the policies? [Y/n]  ' % (len(policyMatches)))
+        user_input = input(f'\n\nThere are {len(policyMatches)} matching policies. Would you like to see the policies? [Y/n]  ')
         if user_input.lower() == 'y' or user_input == '':
             displayMatches(policyMatches)
             return policyMatches
@@ -221,7 +221,7 @@ def displayMatches(policyMatches):
     for policy_name, policy_value in policyMatches.items():
         print('\nMatching policy: ' + policy_name)
         for key, value in policy_value.items():
-            if len(value) > 0:
+            if value:
                 print(f"{key} zone match: {', '.join(value)}")
 
 
@@ -238,7 +238,7 @@ def elementBuilder(policyMatches, new_zone, apiCall_piece):
         if len(elements_all) + len(apiCall_piece) + len(to_element) > 5000:
             elements_list.append(elements_all)
             elements_all = ''
-        if policy_dict['to'] != []:
+        if policy_dict['to']:
             elements_all += to_element
             for item in policy_dict['to']:
                 members.append(f"/entry[@name='{policy_name}']/to/member[text()='{item}']")
@@ -246,7 +246,7 @@ def elementBuilder(policyMatches, new_zone, apiCall_piece):
         if len(elements_all) + len(apiCall_piece) + len(from_element) > 5000:
             elements_list.append(elements_all)
             elements_all = ''
-        if policy_dict['from'] != []:
+        if policy_dict['from']:
             elements_all += from_element
             for item in policy_dict['from']:
                 members.append(f"/entry[@name='{policy_name}']/from/member[text()='{item}']")
@@ -300,7 +300,7 @@ def configUpdate(devTree, dg, rulebase_type, rulebase_category, policyMatches, n
     input('\n\nHit Enter to push the zone changes to PAN config (or CTRL+C to exit the script)... ')
     for policy_name, zone_elements in policyMatches.items():
         for key, value in zone_elements.items():
-            if len(value) > 0:
+            if value:
                 tree_textToReplace = devTree.find(f"{devTreeString}[@name='{policy_name}']/{key}/member[.='{value[0]}']")
                 count = 0
                 for item in value:
@@ -351,7 +351,7 @@ def main():
 
         # Retrieve the policy rules
         policyTree = getPolicies(fwip, mainkey, panoDG, devTree, rulebase_type, rulebase_category)
-        if policyTree == []:
+        if not policyTree:
             time.sleep(1)
             print('\n\nThere were no policies in the rulebase chosen, try again...')
             continue
@@ -364,7 +364,7 @@ def main():
                 time.sleep(1)
                 input("\n\nNote: Your regex string matches your new zone name. If there are any policies that currently contain your new zone,\ndon't worry, they'll be removed from the search query, so they won't be removed from policy. Hit Enter to continue... ")
             policyMatches = filterPolicies(policyTree, regexString, new_zone)
-            if policyMatches == {}:
+            if not policyMatches:
                 time.sleep(1)
                 print('\n\nThere were no policies with zones matching your regex string. Try a new string...')
             else:
